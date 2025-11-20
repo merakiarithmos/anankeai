@@ -13,6 +13,28 @@ import (
 	"github.com/tmc/langchaingo/llms/ollama"
 )
 
+func readOrCreateFile(filename string) ([]byte, error) {
+	fileData, err := os.ReadFile(filename)
+
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			log.Printf("%s not found creating it.\n", filename)
+
+			file, err := os.Create(filename)
+			if err != nil {
+				return nil, err
+
+			}
+			file.Close()
+			fmt.Printf("created empty file: %s\n", filename)
+		} else {
+			return nil, err
+		}
+	}
+	return fileData, nil
+
+}
+
 func main() {
 	godotenv.Load()
 
@@ -29,21 +51,9 @@ func main() {
 		log.Fatal("couldn't get the model")
 	}
 
-	fileData, err := os.ReadFile("todo.txt")
-
+	fileData, err := readOrCreateFile("todo.txt")
 	if err != nil {
-
-		if errors.Is(err, os.ErrNotExist) {
-			log.Printf("todo.txt no found creating it.")
-			file, err := os.Create("todo.txt")
-			if err != nil {
-				panic(err)
-			}
-			file.Close()
-			fmt.Println("created empty file")
-		} else {
-			panic(err)
-		}
+		log.Fatalf("error: %v", err)
 	}
 
 	var humanMsg string
