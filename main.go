@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -35,78 +34,43 @@ func readOrCreateFile(filename string) ([]byte, error) {
 
 }
 
-func main() {
-	godotenv.Load()
-
+func callLocalModel(ctx context.Context, prompt string) (string, error) {
 	model := "mistral:7b"
 
 	if v := os.Getenv("OLLAMA_MODEL_NAME"); v != "" {
 		model = v
 	}
 
-	ctx := context.Background()
+	log.Println("Extracted model name")
+
 	llm, err := ollama.New(ollama.WithModel(model))
-
 	if err != nil {
-		log.Fatal("couldn't get the model")
+		log.Fatalf("failure to create model, err: %v", err)
 	}
-
-	fileData, err := readOrCreateFile("todo.txt")
-	if err != nil {
-		log.Fatalf("error: %v", err)
-	}
-
-	var humanMsg string
-
-	if fileData != nil {
-		humanMsg = fmt.Sprintf("Please summarize the following todo list:\n\n%s", string(fileData))
-	} else {
-		humanMsg = "No todo list exists."
-	}
-
 	var msgs []llms.MessageContent
 
 	// system message defines the available tools
-	msgs = append(msgs, llms.TextParts(llms.ChatMessageTypeSystem, "You are a helpful assistant who can summarize documents."))
-	msgs = append(msgs, llms.TextParts(llms.ChatMessageTypeHuman, humanMsg))
+	msgs = append(msgs, llms.TextParts(llms.ChatMessageTypeSystem, "You are a helpful assistant."))
+	msgs = append(msgs, llms.TextParts(llms.ChatMessageTypeHuman, prompt))
 
+	log.Println("Calling model")
 	completion, err := llm.GenerateContent(ctx, msgs)
-
-	log.Println(msgs)
-
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("failure to call model, err: %v", err)
 	}
-
 	llmResponse := completion.Choices[0].Content
 
-	reader := bufio.NewReader(os.Stdin)
-	fmt.Println("Enter any updates to your todos")
-	text, _ := reader.ReadString('\n')
-	fmt.Println("Updating todo with new input")
+	return llmResponse, nil
+}
 
-	var newMsgs []llms.MessageContent
-	newMsgs = append(msgs, llms.TextParts(llms.ChatMessageTypeSystem, "You are a helpful assistant"))
+func main() {
+	godotenv.Load()
 
-	prompt := fmt.Sprintf("The following is the initial state of the todo list:\n\n%s\nApply the following updates and output a summary of the todo list:\n\n%s", llmResponse, text)
-
-	newMsgs = append(newMsgs, llms.TextParts(llms.ChatMessageTypeHuman, prompt))
-
-	completion, err = llm.GenerateContent(ctx, newMsgs)
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	llmResponse = completion.Choices[0].Content
-	fmt.Println(llmResponse)
-	fmt.Println("writing to todo.txt..")
-
-	data := []byte(llmResponse)
-
-	err = os.WriteFile("todo.txt", data, 0644)
+	ctx := context.Background()
+	modelResponse, err := callLocalModel(ctx, "What is the capital of France?")
 	if err != nil {
 		panic(err)
 	}
+	fmt.Println(modelResponse)
 
 }
