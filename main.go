@@ -1,7 +1,9 @@
 package main
 
 import (
+	"anankeai/internal/models"
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"time"
@@ -11,13 +13,11 @@ import (
 	"github.com/tmc/langchaingo/llms/openai"
 )
 
-type Movie struct {
-	Title    string `json:"title"`
-	Director string `json:"director"`
-	Year     int    `json:"year"`
+type MovieResponse struct {
+	Movies []models.Movie `json:"movies"`
 }
 
-func generateMovies(number int, description string) error {
+func generateMovies(number int, description string, movieChan chan models.Movie) error {
 	format := &openai.ResponseFormat{
 		Type: "json_schema",
 		JSONSchema: &openai.ResponseFormatJSONSchema{
@@ -73,19 +73,35 @@ func generateMovies(number int, description string) error {
 		log.Fatal(err)
 		return err
 	}
-	log.Println(completion.Choices[0].Content)
+
+	jsonData := completion.Choices[0].Content
+
+	var movieResponse MovieResponse
+
+	if err := json.Unmarshal([]byte(jsonData), &movieResponse); err != nil {
+		log.Fatal(err)
+		return err
+	}
+
+	// print results
+	for _, m := range movieResponse.Movies {
+		fmt.Printf("%s (%d), %s\n", m.Title, m.Year, m.Director)
+		movieChan <- m
+	}
 
 	return nil
 }
 
 func main() {
 	godotenv.Load()
-	go generateMovies(5, "set in the 80s.")
-	go generateMovies(5, "incredibly scary.")
-	go generateMovies(5, "that won best picture.")
-	go generateMovies(5, "cheesy romcom.")
-	go generateMovies(5, "set in Toronto.")
-	go generateMovies(5, "that are about hiests.")
 
-	time.Sleep(30 * time.Second)
+	movieChan := make(chan models.Movie, 5)
+	go generateMovies(5, "set in the 80s.", movieChan)
+	go generateMovies(5, "set in the 80s.", movieChan)
+
+	for movie := range movieChan {
+		fmt.Println(movie.Title)
+	}
+
+	time.Sleep(20 * time.Second)
 }
