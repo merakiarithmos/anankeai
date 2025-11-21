@@ -9,7 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"time"
+	"sync"
 
 	"github.com/joho/godotenv"
 	"github.com/tmc/langchaingo/llms"
@@ -106,7 +106,6 @@ func main() {
 	movieService := service.NewMovieService(movieRepo)
 
 	existingMovies, err := movieService.GetAllMovies()
-	log.Println(existingMovies)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -115,13 +114,37 @@ func main() {
 		fmt.Printf("%s (%d), %s\n", m.Title, m.Year, m.Director)
 	}
 
+	var wg sync.WaitGroup
 	movieChan := make(chan models.Movie, 5)
-	go generateMovies(5, "set in the 80s.", movieChan)
-	go generateMovies(5, "set in the 90s.", movieChan)
+
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		generateMovies(10, "set in the 70s.", movieChan)
+	}()
+	go func() {
+		defer wg.Done()
+		generateMovies(10, "set in the 60s.", movieChan)
+	}()
+
+	// close the channel after all the goroutines are done
+	go func() {
+		wg.Wait()
+		close(movieChan)
+	}()
 
 	for movie := range movieChan {
-		fmt.Println(movie.Title)
+		movieService.InsertMovie(movie)
 	}
 
-	time.Sleep(20 * time.Second)
+	existingMovies, err = movieService.GetAllMovies()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for _, m := range existingMovies {
+		fmt.Printf("%s (%d), %s\n", m.Title, m.Year, m.Director)
+	}
+
 }

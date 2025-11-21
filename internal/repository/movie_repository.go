@@ -4,6 +4,7 @@ import (
 	"anankeai/internal/db"
 	"anankeai/internal/models"
 	"context"
+	"time"
 )
 
 type MovieRepository struct{}
@@ -34,4 +35,16 @@ func (r *MovieRepository) GetAllMovies() ([]models.Movie, error) {
 		return nil, err
 	}
 	return movies, nil
+}
+
+func (r *MovieRepository) InsertMovie(m models.Movie) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// use parameterized query to prevent SQL injection
+	_, err := db.Pool.Exec(ctx,
+		"INSERT INTO movies (title, director, year) VALUES ($1, $2, $3)",
+		m.Title, m.Director, m.Year,
+	)
+	return err
 }

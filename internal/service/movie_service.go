@@ -16,3 +16,7 @@ func NewMovieService(repo *repository.MovieRepository) *MovieService {
 func (s *MovieService) GetAllMovies() ([]models.Movie, error) {
 	return s.repo.GetAllMovies()
 }
+
+func (s *MovieService) InsertMovie(m models.Movie) error {
+	return s.repo.InsertMovie(m)
+}
