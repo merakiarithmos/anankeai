@@ -1,7 +1,10 @@
 package main
 
 import (
+	"anankeai/internal/db"
 	"anankeai/internal/models"
+	"anankeai/internal/repository"
+	"anankeai/internal/service"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -93,11 +96,28 @@ func generateMovies(number int, description string, movieChan chan models.Movie)
 }
 
 func main() {
+	// first load env variables
 	godotenv.Load()
+
+	db.Connect()
+	defer db.Close()
+
+	movieRepo := repository.NewMovieRepository()
+	movieService := service.NewMovieService(movieRepo)
+
+	existingMovies, err := movieService.GetAllMovies()
+	log.Println(existingMovies)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for _, m := range existingMovies {
+		fmt.Printf("%s (%d), %s\n", m.Title, m.Year, m.Director)
+	}
 
 	movieChan := make(chan models.Movie, 5)
 	go generateMovies(5, "set in the 80s.", movieChan)
-	go generateMovies(5, "set in the 80s.", movieChan)
+	go generateMovies(5, "set in the 90s.", movieChan)
 
 	for movie := range movieChan {
 		fmt.Println(movie.Title)
